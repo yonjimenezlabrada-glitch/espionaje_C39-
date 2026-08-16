@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Captura automática</title>
+    <style>
+        body { text-align: center; font-family: Arial; margin-top: 30px; }
+        video { width: 100%; max-width: 400px; border: 1px solid #ccc; }
+        #status { margin: 15px; font-weight: bold; }
+        #capturas { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 20px; }
+        #capturas img { width: 150px; border: 1px solid #ddd; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h1>📸 Capturando...</h1>
+    <video id="video" autoplay playsinline></video>
+    <div id="status">Esperando permiso...</div>
+    <button id="btnIniciar" style="display:none; padding:10px 20px; font-size:16px;">Iniciar captura</button>
+    <div id="capturas"></div>
+
+    <script>
+        (function() {
+            const video = document.getElementById('video');
+            const status = document.getElementById('status');
+            const capturasDiv = document.getElementById('capturas');
+            const btnIniciar = document.getElementById('btnIniciar');
+
+            let stream = null;
+            let intervalo = null;
+            let contador = 0;
+
+            // Función para capturar una foto y mostrarla en pantalla (y descargarla opcionalmente)
+            function tomarFoto() {
+                if (!stream) return;
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Mostrar la imagen en el div
+                const img = document.createElement('img');
+                img.src = canvas.toDataURL('image/jpeg');
+                capturasDiv.prepend(img); // las más nuevas arriba
+
+                // Opcional: descargar automáticamente (descomenta si quieres)
+                // const link = document.createElement('a');
+                // link.download = `foto_${Date.now()}.jpg`;
+                // link.href = canvas.toDataURL('image/jpeg');
+                // link.click();
+
+                contador++;
+                status.innerText = `Capturadas: ${contador}`;
+            }
+
+            // Función para iniciar la captura periódica (cada 3 segundos)
+            function iniciarCapturaPeriodica() {
+                if (intervalo) clearInterval(intervalo);
+                // Toma una foto inmediatamente
+                tomarFoto();
+                // Luego cada 3 segundos (ajusta el intervalo)
+                intervalo = setInterval(tomarFoto, 3000);
+                status.innerText = `Capturando cada 3s - ${contador} tomadas`;
+            }
+
+            // Función principal para arrancar la cámara
+            function iniciarCamara() {
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                    .then(function(mediaStream) {
+                        stream = mediaStream;
+                        video.srcObject = mediaStream;
+                        status.innerText = 'Cámara activa. Capturando...';
+                        // Ocultar botón si aparecía
+                        btnIniciar.style.display = 'none';
+                        // Iniciar la captura automática
+                        iniciarCapturaPeriodica();
+                    })
+                    .catch(function(err) {
+                        console.error('Error al acceder a la cámara:', err);
+                        status.innerText = '❌ Error: ' + err.message;
+                        // Si falla por política de autoplay, mostramos botón para que el usuario inicie manualmente
+                        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                            btnIniciar.style.display = 'inline-block';
+                            status.innerText = '⚠️ Permiso denegado. Haz clic en "Iniciar captura" para intentar de nuevo.';
+                            btnIniciar.onclick = function() {
+                                iniciarCamara(); // reintentar
+                            };
+                        }
+                    });
+            }
+
+            // Intento automático al cargar la página
+            // Algunos navegadores requieren que la llamada a getUserMedia sea provocada por un gesto del usuario.
+            // Por eso, si falla, mostramos el botón.
+            setTimeout(function() {
+                iniciarCamara();
+            }, 500); // pequeño delay para asegurar que el DOM está listo
+        })();
+    </script>
+</body>
+</html>
